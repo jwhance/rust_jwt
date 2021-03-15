@@ -2,6 +2,7 @@
 // https://github.com/rib/jsonwebtokens
 //
 use serde_json::json;
+use serde_json::{Map, Value};
 use std::fs;
 use std::process;
 use std::str::FromStr;
@@ -48,7 +49,9 @@ fn main() -> Result<(), jwt::error::Error> {
     //         .value_of("jwtfile")
     // );
 
-    if matches.subcommand_name().unwrap() == String::from("validate") {
+    if matches.subcommand_name() == None {
+
+    } else if matches.subcommand_name().unwrap() == String::from("validate") {
         println!("Validating JWT");
 
         // Options
@@ -99,8 +102,12 @@ fn main() -> Result<(), jwt::error::Error> {
 
         let alg = Algorithm::new_rsa_pem_signer(jwt_alg, &private_key.as_bytes())?;
         let header = json!({ "alg": alg.name(), "typ": "JWT" });
-        let claims = json!({ "iss": "some-issuer.com", "aud": "some-audience" });
-        let token_str = jwt::encode(&header, &claims, &alg)?;
+        let mut map = Map::new();
+        map.insert(String::from("iss"), Value::String("some-issuer".to_string()));
+        map.insert(String::from("aud"), Value::String("some-aud".to_string()));
+
+        //let claims = json!({ "iss": "some-issuer.com", "aud": "some-audience" });
+        let token_str = jwt::encode(&header, &map, &alg)?;
 
         println!("{0}", token_str);
     } else {

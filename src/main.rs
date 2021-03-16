@@ -76,13 +76,12 @@ fn main() -> Result<(), jwt::error::Error> {
 
         let alg = Algorithm::new_rsa_pem_verifier(jwt_alg, &public_key.as_bytes()).unwrap();
         let mut verifier = Verifier::create();
-        // if 1 == 1 {
-        //     verifier.issuer("xyz");
-        // }
-        //.issuer("some-issuer.com")
-        //.audience("some-audience")
-        //.build()
-        //.unwrap();
+        if get_claim_verification_value(sub_command, "iss") != None {
+            verifier.issuer(get_claim_verification_value(sub_command, "iss").unwrap());
+        }
+        if get_claim_verification_value(sub_command, "aud") != None {
+            verifier.audience(get_claim_verification_value(sub_command, "aud").unwrap());
+        }
 
         match verifier.build().unwrap().verify(&jwt.trim(), &alg) {
             Ok(output) => {
@@ -130,6 +129,15 @@ fn main() -> Result<(), jwt::error::Error> {
     }
 
     process::exit(0);
+}
+
+fn get_claim_verification_value(sub_command: &clap::ArgMatches, claim: &str) -> Option<String> {
+    let clm = sub_command.value_of(claim);
+    if clm != None {
+        Some(clm.unwrap().to_string())
+    } else {
+        None
+    }
 }
 
 fn add_claim_str(map: &mut Map<String, Value>, sub_command: &clap::ArgMatches, claim: &str) {

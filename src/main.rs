@@ -90,7 +90,7 @@ fn main() -> Result<(), jwt::error::Error> {
         //
         // GENERATE JWT
         //
-        eprintln!("Generating JWT"); // NOTE: PS256 not working properly!
+        eprintln!("Generating JWT");
 
         // Options
         let sub_command = matches.subcommand_matches("generate").unwrap();
@@ -107,17 +107,22 @@ fn main() -> Result<(), jwt::error::Error> {
         let alg = Algorithm::new_rsa_pem_signer(jwt_alg, &private_key.as_bytes())?;
         let header = json!({ "alg": alg.name(), "typ": "JWT" });
         let mut claims_map = Map::new();
-        claims_map.insert(
-            String::from("iss"),
-            Value::String("some-issuer".to_string()),
-        );
+
+        let issuer = sub_command.value_of("issuer");
+        // if issuer != None {
+        //     claims_map.insert(
+        //         String::from("iss"),
+        //         Value::String(String::from(issuer.unwrap()))
+        //     );
+        // }
+
         claims_map.insert(String::from("aud"), Value::String("some-aud".to_string()));
         claims_map.insert(String::from("iat"), Value::from(current_time));
 
         // Add any optional claims: iss, sub, aud, exp
         let iss = sub_command.value_of("issuer");
         if iss != None {
-            println!("Issuer: {:?}", iss.unwrap());
+            eprintln!("Issuer: {:?}", iss.unwrap());
             claims_map.insert(String::from("iss"), Value::String(iss.unwrap().to_string()));
         }
 

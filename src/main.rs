@@ -14,6 +14,8 @@ use clap::clap_app;
 use jsonwebtokens as jwt;
 use jwt::{raw, Algorithm, AlgorithmID, Verifier};
 
+use openssl::x509;
+
 fn main() -> Result<(), jwt::error::Error> {
     let matches = clap_app!(myapp =>
         (version: "0.1")
@@ -44,6 +46,15 @@ fn main() -> Result<(), jwt::error::Error> {
     )
     .get_matches();
 
+    eprintln!("Beginning JWT Utility");
+
+    // Read X.509 certificate from file
+    let public_cert =
+        fs::read_to_string("./src/fiserv_test.crt").expect("Something went wrong reading the file");
+
+    // For X.509 certificate: https://docs.rs/openssl/0.10.4/openssl/x509/struct.X509.html
+    let x509 = X509::from_pem()?;
+
     let current_time = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
@@ -51,9 +62,7 @@ fn main() -> Result<(), jwt::error::Error> {
 
     if matches.subcommand_name() == None {
     } else if matches.subcommand_name().unwrap() == String::from("validate") {
-        println!("Validating JWT");
-
-        // For X.509 certifiate: https://docs.rs/openssl/0.10.4/openssl/x509/struct.X509.html
+        eprintln!(" => Validating JWT");
 
         // Options
         let sub_command = matches.subcommand_matches("validate").unwrap();
@@ -68,9 +77,9 @@ fn main() -> Result<(), jwt::error::Error> {
         let jwt = fs::read_to_string(&jwt_file).expect("Something went wrong reading the file");
 
         let decoded = raw::decode_only(&jwt)?;
-        eprintln!("Header: {:?}", decoded.header);
+        eprintln!("      Header: {:?}", decoded.header);
         //eprintln!("Alg: {0}", decoded.header.get("alg").unwrap());
-        eprintln!("Payload: {:?}", decoded.claims);
+        eprintln!("      Payload: {:?}", decoded.claims);
 
         let jwt_alg = AlgorithmID::from_str(decoded.header["alg"].as_str().unwrap()).unwrap();
 
@@ -85,17 +94,17 @@ fn main() -> Result<(), jwt::error::Error> {
 
         match verifier.build().unwrap().verify(&jwt.trim(), &alg) {
             Ok(output) => {
-                println!("Verification: {0}", output);
+                println!("      Verification: {0}", output);
             }
             Err(error) => {
-                println!("Error: {:?}", error);
+                eprintln!("      Error: {:?}", error);
             }
         }
     } else if matches.subcommand_name().unwrap() == String::from("generate") {
         //
         // GENERATE JWT
         //
-        eprintln!("Generating JWT");
+        eprintln!(" => Generating JWT");
 
         // Options
         let sub_command = matches.subcommand_matches("generate").unwrap();

@@ -12,7 +12,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use clap::clap_app;
 
 use jsonwebtokens as jwt;
-use jwt::{Algorithm, AlgorithmID, Verifier};
+use jwt::{raw, Algorithm, AlgorithmID, Verifier};
 
 fn main() -> Result<(), jwt::error::Error> {
     let matches = clap_app!(myapp =>
@@ -41,16 +41,6 @@ fn main() -> Result<(), jwt::error::Error> {
     )
     .get_matches();
 
-    //println!("Matches: {:?}", matches);
-    //println!("Matches: {:?}", matches.subcommand_name());
-    // println!(
-    //     "Matches: {:?}",
-    //     matches
-    //         .subcommand_matches("validate")
-    //         .unwrap()
-    //         .value_of("jwtfile")
-    // );
-
     let current_time = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
@@ -61,31 +51,41 @@ fn main() -> Result<(), jwt::error::Error> {
         println!("Validating JWT");
 
         // Options
-        let jwt_file = matches
-            .subcommand_matches("generate")
-            .unwrap()
-            .value_of("jwtfile");
+        let sub_command = matches.subcommand_matches("validate").unwrap();
+        let public_key_file = sub_command.value_of("publickey").unwrap();
+        let jwt_file = sub_command.value_of("jwtfile").unwrap();
 
-    // Read public key from file
-    // let public_key = fs::read_to_string("src/pkcs8_public_key.pem")
-    //     .expect("Something went wrong reading the file");
+        //Read public key from file
+        let public_key =
+            fs::read_to_string(&public_key_file).expect("Something went wrong reading the file");
 
-    // let alg =
-    //     Algorithm::new_rsa_pem_verifier(AlgorithmID::RS256, &public_key.as_bytes()).unwrap();
-    // let verifier = Verifier::create()
-    //     .issuer("some-issuer.com")
-    //     .audience("some-audience")
-    //     .build()
-    //     .unwrap();
+        //Read JWT from file
+        let jwt = fs::read_to_string(&jwt_file).expect("Something went wrong reading the file");
 
-    // match verifier.verify(&token_str, &alg) {
-    //     Ok(output) => {
-    //         println!("Verification: {0}", output);
-    //     }
-    //     Err(error) => {
-    //         println!("Error: {:?}", error);
-    //     }
-    // }
+        let decoded = raw::decode_only(&jwt)?;
+        println!("JWT: {:?}", decoded.header);
+        println!("Alg: {0}", decoded.header.get("alg").unwrap());
+        println!("JWT: {:?}", decoded.claims);
+
+        let jwt_alg =
+            AlgorithmID::from_str(Value::String(decoded.header.get("alg").unwrap())).unwrap();
+
+        let alg =
+            Algorithm::new_rsa_pem_verifier(AlgorithmID::RS256, &public_key.as_bytes()).unwrap();
+        let verifier = Verifier::create()
+            //.issuer("some-issuer.com")
+            //.audience("some-audience")
+            .build()
+            .unwrap();
+
+        match verifier.verify(&jwt, &alg) {
+            Ok(output) => {
+                println!("Verification: {0}", output);
+            }
+            Err(error) => {
+                println!("Error: {:?}", error);
+            }
+        }
     } else if matches.subcommand_name().unwrap() == String::from("generate") {
         //
         // GENERATE JWT
@@ -123,9 +123,9 @@ fn main() -> Result<(), jwt::error::Error> {
 
         let token_str = jwt::encode(&header, &claims_map, &alg)?;
 
-        println!("{0}", token_str);
+        print!("{0}", token_str.trim());
     } else {
-        println!("Unknown option");
+        eprintln!("Unknown option");
     }
 
     process::exit(0);

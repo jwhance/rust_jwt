@@ -27,16 +27,19 @@ fn main() -> Result<(), jwt::error::Error> {
             (@arg debug: -d --debug ... "Sets the level of debugging information")
             (@arg privatekey: -p --privatekey +required ... "Private Key PEM file")
             (@arg algorithm: -a --algorithm +required ... "JWT signing algorithm")
-            (@arg issuer: -i --iss ... "Issuer")
-            (@arg subject: -s --sub ... "Subject")
-            (@arg audience: -u --aud ... "Audience")
-            (@arg expiration: -e -exp ... "Expiration in minutes")
+            (@arg iss: -i --iss ... "Issuer")
+            (@arg sub: -s --sub ... "Subject")
+            (@arg aud: -u --aud ... "Audience")
+            (@arg exp: -e --exp ... "Expiration in minutes")
         )
         (@subcommand validate =>
             (about: "Validates a JWT against the specified parameters.")
             (@arg debug: -d --debug ... "Sets the level of debugging information")
             (@arg publickey: -p --publickey +required ... "Public Key PEM file")
             (@arg jwtfile: -j --jwtfile +required ... "JWT file")
+            (@arg iss: -i --iss ... "Issuer")
+            (@arg sub: -s --sub ... "Subject")
+            (@arg aud: -u --aud ... "Audience")
         )
     )
     .get_matches();
@@ -49,6 +52,8 @@ fn main() -> Result<(), jwt::error::Error> {
     if matches.subcommand_name() == None {
     } else if matches.subcommand_name().unwrap() == String::from("validate") {
         println!("Validating JWT");
+
+        // For X.509 certifiate: https://docs.rs/openssl/0.10.4/openssl/x509/struct.X509.html
 
         // Options
         let sub_command = matches.subcommand_matches("validate").unwrap();
@@ -63,22 +68,23 @@ fn main() -> Result<(), jwt::error::Error> {
         let jwt = fs::read_to_string(&jwt_file).expect("Something went wrong reading the file");
 
         let decoded = raw::decode_only(&jwt)?;
-        println!("JWT: {:?}", decoded.header);
-        println!("Alg: {0}", decoded.header.get("alg").unwrap());
-        println!("JWT: {:?}", decoded.claims);
+        eprintln!("Header: {:?}", decoded.header);
+        //eprintln!("Alg: {0}", decoded.header.get("alg").unwrap());
+        eprintln!("Payload: {:?}", decoded.claims);
 
-        let jwt_alg =
-            AlgorithmID::from_str(decoded.header["alg"].as_str().unwrap()).unwrap();
+        let jwt_alg = AlgorithmID::from_str(decoded.header["alg"].as_str().unwrap()).unwrap();
 
-        let alg =
-            Algorithm::new_rsa_pem_verifier(jwt_alg, &public_key.as_bytes()).unwrap();
-        let verifier = Verifier::create()
-            //.issuer("some-issuer.com")
-            //.audience("some-audience")
-            .build()
-            .unwrap();
+        let alg = Algorithm::new_rsa_pem_verifier(jwt_alg, &public_key.as_bytes()).unwrap();
+        let mut verifier = Verifier::create();
+        // if 1 == 1 {
+        //     verifier.issuer("xyz");
+        // }
+        //.issuer("some-issuer.com")
+        //.audience("some-audience")
+        //.build()
+        //.unwrap();
 
-        match verifier.verify(&jwt, &alg) {
+        match verifier.build().unwrap().verify(&jwt.trim(), &alg) {
             Ok(output) => {
                 println!("Verification: {0}", output);
             }
@@ -94,7 +100,6 @@ fn main() -> Result<(), jwt::error::Error> {
 
         // Options
         let sub_command = matches.subcommand_matches("generate").unwrap();
-
         let _alg = sub_command.value_of("algorithm").unwrap();
         let private_key_file = sub_command.value_of("privatekey").unwrap();
 
@@ -108,23 +113,14 @@ fn main() -> Result<(), jwt::error::Error> {
         let header = json!({ "alg": alg.name(), "typ": "JWT" });
         let mut claims_map = Map::new();
 
-        let issuer = sub_command.value_of("issuer");
-        // if issuer != None {
-        //     claims_map.insert(
-        //         String::from("iss"),
-        //         Value::String(String::from(issuer.unwrap()))
-        //     );
-        // }
-
-        claims_map.insert(String::from("aud"), Value::String("some-aud".to_string()));
+        // iat = current time
         claims_map.insert(String::from("iat"), Value::from(current_time));
 
         // Add any optional claims: iss, sub, aud, exp
-        let iss = sub_command.value_of("issuer");
-        if iss != None {
-            eprintln!("Issuer: {:?}", iss.unwrap());
-            claims_map.insert(String::from("iss"), Value::String(iss.unwrap().to_string()));
-        }
+        add_claim_str(&mut claims_map, sub_command, "aud");
+        add_claim_str(&mut claims_map, sub_command, "iss");
+        add_claim_str(&mut claims_map, sub_command, "sub");
+        add_claim_exp(&mut claims_map, sub_command, "exp", current_time);
 
         let token_str = jwt::encode(&header, &claims_map, &alg)?;
 
@@ -134,4 +130,24 @@ fn main() -> Result<(), jwt::error::Error> {
     }
 
     process::exit(0);
+}
+
+fn add_claim_str(map: &mut Map<String, Value>, sub_command: &clap::ArgMatches, claim: &str) {
+    let clm = sub_command.value_of(claim);
+    if clm != None {
+        map.insert(String::from(claim), Value::String(clm.unwrap().to_string()));
+    }
+}
+
+fn add_claim_exp(
+    map: &mut Map<String, Value>,
+    sub_command: &clap::ArgMatches,
+    claim: &str,
+    current_time: u64,
+) {
+    let clm = sub_command.value_of(claim);
+    if clm != None {
+        let exp: u64 = clm.unwrap().parse().unwrap();
+        map.insert(String::from(claim), Value::from(exp + current_time));
+    }
 }

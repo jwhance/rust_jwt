@@ -68,10 +68,10 @@ fn main() -> Result<(), jwt::error::Error> {
         println!("JWT: {:?}", decoded.claims);
 
         let jwt_alg =
-            AlgorithmID::from_str(Value::String(decoded.header.get("alg").unwrap())).unwrap();
+            AlgorithmID::from_str(decoded.header["alg"].as_str().unwrap()).unwrap();
 
         let alg =
-            Algorithm::new_rsa_pem_verifier(AlgorithmID::RS256, &public_key.as_bytes()).unwrap();
+            Algorithm::new_rsa_pem_verifier(jwt_alg, &public_key.as_bytes()).unwrap();
         let verifier = Verifier::create()
             //.issuer("some-issuer.com")
             //.audience("some-audience")

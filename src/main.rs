@@ -4,8 +4,8 @@
 use serde_json::json;
 use serde_json::{Map, Value};
 use std::fs;
-use std::str;
 use std::process;
+use std::str;
 use std::str::FromStr;
 
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -15,7 +15,7 @@ use clap::clap_app;
 use jsonwebtokens as jwt;
 use jwt::{raw, Algorithm, AlgorithmID, Verifier};
 
-use openssl::x509::{X509};
+use openssl::x509::X509;
 
 fn main() -> Result<(), jwt::error::Error> {
     let matches = clap_app!(myapp =>
@@ -55,10 +55,10 @@ fn main() -> Result<(), jwt::error::Error> {
 
     // For X.509 certificate: https://docs.rs/openssl/0.10.4/openssl/x509/struct.X509.html
     let x509 = X509::from_pem(public_cert.as_bytes()).unwrap();
-    eprintln!("X509: {:?}", x509.issuer_name());
-    eprintln!("X509: {:?}", x509.not_before());
-    eprintln!("X509: {:?}", x509.not_after());
-    eprintln!("X509: {:?}", x509.public_key().unwrap());
+    eprintln!("X509 Issuer    : {:?}", x509.issuer_name());
+    eprintln!("X509 Not Before: {:?}", x509.not_before());
+    eprintln!("X509 Not After : {:?}", x509.not_after());
+    eprintln!("X509 PKey      : {:?}", x509.public_key().unwrap());
     let pubk = x509.public_key().unwrap().public_key_to_pem().unwrap();
     eprintln!("PUBK: {:?}", str::from_utf8(&pubk).unwrap());
     // End of X.509 stuff
